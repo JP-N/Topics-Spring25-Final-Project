@@ -1,9 +1,9 @@
 from beanie import Document
-from pydantic import EmailStr, Field
+from pydantic import Field
 from datetime import datetime
 
 class User(Document):
-    email: EmailStr
+    email: str
     username: str
     hashed_password: str
     profile_picture: str = "default.jpg"

@@ -1,13 +1,70 @@
 import {useState, useEffect} from 'react';
 import MainLogo from '../assets/mumundosvgSVG.svg';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const HomePage = () => {
-
+    const navigate = useNavigate();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loading, setLoading] = useState<boolean>(true);
 
-    const handleLogin = () => setIsAuthenticated(true);
-    const handleLogout = () => setIsAuthenticated(false);
+    // Check auth on mount
+    useEffect(() => {
+
+        const checkAuthStatus = async () => {
+            const token = localStorage.getItem('token');
+
+            if (token) {
+                try {
+                    // Set auth header
+                    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+                    // Verify token
+                    await axios.get('/api/auth/me');
+                    setIsAuthenticated(true);
+                } catch (error) {
+                    localStorage.removeItem('token');
+                    delete axios.defaults.headers.common['Authorization'];
+                    setIsAuthenticated(false);
+                }
+            }
+
+            setLoading(false);
+        };
+
+        checkAuthStatus();
+
+        const handleLogin = () => setIsAuthenticated(true);
+        const handleLogout = () => setIsAuthenticated(false);
+
+        window.addEventListener('login', handleLogin);
+        window.addEventListener('logout', handleLogout);
+
+        return () => {
+            window.removeEventListener('login', handleLogin);
+            window.removeEventListener('logout', handleLogout);
+        };
+    }, []);
+
+    // Login Redirect
+    const handleLogin = () => navigate('/login');
+
+    // Logout Redirect
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        delete axios.defaults.headers.common['Authorization'];
+        setIsAuthenticated(false);
+        window.dispatchEvent(new Event('logout'));
+    };
+
+    // Loading spinner
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-mumundoSnow">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-mumundoRed"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex-grow bg-mumundoSnow min-h-screen min-w-screen">
@@ -21,7 +78,7 @@ const HomePage = () => {
                             </div>
                         </div>
 
-                        {/* Login section, checks authentication status and displays appropriate button text */}
+                        {/* Login section, updated*/}
                         <div>
                             {isAuthenticated ? (
                                 <>
@@ -46,7 +103,7 @@ const HomePage = () => {
             <main className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="py-10 sm:py-16">
 
-                    {/* Header text and formatting*/}
+                    {/* Header text */}
                     <div className="mx-auto max-w-3xl px-6 lg:max-w-7xl lg:px-8">
                         <p className="mx-auto mt-2 max-w-2xl text-center text-4xl font-semibold tracking-tight text-balance text-mumundoBlackOlive sm:text-5xl">
                             Build playlists with Mumundo and grow your online community.</p>
@@ -92,7 +149,6 @@ const HomePage = () => {
                                             leaving you a speedy experience that won't hold you back.</p>
                                     </div>
 
-                                    {/* Picture I also found */}
                                     <div
                                         className="flex flex-1 items-center justify-center px-8 max-lg:pt-10 max-lg:pb-12 sm:px-10 lg:pb-2">
                                         <img className="w-full max-lg:max-w-xs"
@@ -124,7 +180,6 @@ const HomePage = () => {
                     </div>
                 </div>
             </main>
-            {/* Persnaps a fancy footer? */}
         </div>
     );
 };

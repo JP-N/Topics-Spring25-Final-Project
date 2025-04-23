@@ -1,125 +1,146 @@
-from fastapi import APIRouter, HTTPException, status, File, UploadFile, Depends
-from pydantic import BaseModel, EmailStr
-from user import User
-from security import hash_password, verify_password
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from typing import Optional
+
 import jwt
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
 
+from mumundo.backend.user import User
 
+# Router
+router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# JWT settings and password hashing
 SECRET_KEY = "2a33c01bffbd1620f710c408f0a630f839e449b4c3356a15866347f9416bdef5"
 ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
-auth_router = APIRouter()
-
+# Models/Classes
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str
     username: str
     password: str
 
-class TokenData(BaseModel):
-    username: str
-    exp_datetime: datetime
+class UserLogin(BaseModel):
+    email: str
+    password: str
 
-UPLOAD_DIR = "uploaded_pics"
-
-#ensure the upload directory exists
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
-
-def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes=15)):
-    payload = data.copy()
-    expire = datetime.now(timezone.utc) + expires_delta
-    payload.update({"exp": expire})
-    encoded = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded
-
-def decode_jwt_token(token: str) -> TokenData | None:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("username")
-        exp: int = payload.get("exp")
-        return TokenData(username=username, exp_datetime=datetime.fromtimestamp(exp))
-    except jwt.InvalidTokenError:
-        return None
-
-@auth_router.post("/register")
-async def register(user: UserCreate, pfp: UploadFile = File(None)):
-    # Check if user already exists
-    existing = await User.find_one(User.email == user.email)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already exists"
-        )
-
-    #handle profile picture upload (if provided)
-    profile_picture = "default.jpg"
-
-    if pfp:
-        file_location = os.path.join(UPLOAD_DIR, pfp.filename)
-        with open(file_location, "wb") as file:
-            file.write(await pfp.read())
-        profile_picture = pfp.filename  #update the profile picture filename
-    
-    #hash password
-    hashed_pw = hash_password(user.password)
-    
-    #create a new user object
-    new_user = User(
-        email=user.email,
-        username=user.username,
-        hashed_password=hashed_pw,
-        profile_picture=profile_picture
-    )
-    
-    #save the user to the database
-    await new_user.insert()
-
-    return {"message": "User registered successfully!"}
-
-#login route to create access token
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-@auth_router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: UserCreate):
-    #check if user exists
-    user = await User.find_one(User.email == form_data.email)
-    if user is None or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
-        )
+class TokenData(BaseModel):
+    email: Optional[str] = None
 
-    #create access token
-    token = create_access_token({"username": user.username})
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-    return {"access_token": token, "token_type": "bearer"}
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-#protect routes with JWT (example route)
-@auth_router.get("/users/me")
-async def read_users_me(token: str = Depends(decode_jwt_token)):
-    if token is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail = "Invalid or expired token"
-        )
-    return {"username": token.username}
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-#dummy user test
-@auth_router.get("/create_dummy_user")
-async def create_dummy_user():
-    dummy = await User.find_one(User.email == "dummy@example.com")
-    if dummy:
-        return {"message": "Dummy user already exists."}
+async def get_user_by_email(email: str):
+    return await User.find_one(User.email == email)
 
-    user = User(
-        email ="dummy@example.com",
-        username ="dummy",
-        hashed_password =hash_password("dummy123"),
-        profile_picture ="default.jpg"
+async def authenticate_user(email: str, password: str):
+    user = await get_user_by_email(email)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
     )
-    await user.insert()
-    return {"message": "Dummy user created."}
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+        token_data = TokenData(email=email)
+    except:
+        raise credentials_exception
+
+    user = await get_user_by_email(token_data.email)
+
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
+# Route for creating a new user
+@router.post("/register", response_model=Token)
+async def register(user_data: UserCreate):
+
+    # Check if user already exists, if not create new entry
+    existing_user = await get_user_by_email(user_data.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+
+    hashed_password = get_password_hash(user_data.password)
+    new_user = User(
+        email=user_data.email,
+        username=user_data.username,
+        hashed_password=hashed_password
+    )
+
+    await new_user.insert()
+
+    # Create and return access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user_data.email}, expires_delta=access_token_expires
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# Route for existing user login
+@router.post("/login", response_model=Token)
+async def login(form_data: UserLogin):
+    user = await authenticate_user(form_data.email, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# Token auth
+@router.get("/me")
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return {
+        "email": current_user.email,
+        "username": current_user.username,
+        "created_at": current_user.created_at,
+        "profile_picture": current_user.profile_picture
+    }
