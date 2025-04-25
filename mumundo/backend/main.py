@@ -8,6 +8,14 @@ from mumundo.backend.auth import router as auth_router
 from mumundo.backend.music import music_router
 from mumundo.backend.user import User
 from mumundo.backend.db import init_db
+import logging
+
+logging.basicConfig(
+    filename="app.log",
+    format="%(asctime)s: %(name)s: %(levelname).4s - %(message)s",
+    level=logging.INFO,
+)
+
 
 app = FastAPI(title="Mumundo API")
 
@@ -24,6 +32,7 @@ app.include_router(music_router, prefix="/music", tags=["music"])
 
 @app.on_event("startup")
 async def startup_event():
+    
     await init_db()
 
     try:
