@@ -4,6 +4,8 @@ from mumundo.backend.user import User
 import os
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 password = os.getenv("MONGO_PASSWORD")
@@ -12,5 +14,6 @@ full_uri = uri_template.replace("<db_password>", password)
 
 async def init_db():
     client = AsyncIOMotorClient(full_uri)
+    logger.info("database client created")
     db = client["Cluster0"]
     await init_beanie(database=db, document_models=[User])
