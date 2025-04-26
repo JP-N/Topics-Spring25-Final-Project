@@ -1,14 +1,16 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-
+import logging
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 
-from mumundo.backend.user import User
+from mumundo.api.models.user import User
+# Logging
+logger = logging.getLogger(__name__)
 
 # Router
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -70,15 +72,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        logger.info("Decoding access token")
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
         token_data = TokenData(email=email)
     except:
         raise credentials_exception
+        logger.warning("Invalid token received during authentication")
 
+    logger.info(f"Token valid for user: {token_data.email}")
     user = await get_user_by_email(token_data.email)
-
+    
     if user is None:
         raise credentials_exception
 
@@ -91,6 +96,7 @@ async def register(user_data: UserCreate):
 
     # Check if user already exists, if not create new entry
     existing_user = await get_user_by_email(user_data.email)
+    logger.info(f"Attempting to register user with email: {user_data.email}")
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -106,7 +112,7 @@ async def register(user_data: UserCreate):
     )
 
     await new_user.insert()
-
+    logger.info(f"Successfully registered user: {user_data.email}")
     # Create and return access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -120,7 +126,9 @@ async def register(user_data: UserCreate):
 @router.post("/login", response_model=Token)
 async def login(form_data: UserLogin):
     user = await authenticate_user(form_data.email, form_data.password)
+    logger.info(f"Login attempt for email: {form_data.email}")
     if not user:
+        logger.warning(f"Failed login attempt for email: {form_data.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -131,7 +139,7 @@ async def login(form_data: UserLogin):
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-
+    logger.info(f"User logged in successfully: {form_data.email}")
     return {"access_token": access_token, "token_type": "bearer"}
 
 
