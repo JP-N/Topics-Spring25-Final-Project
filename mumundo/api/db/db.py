@@ -3,6 +3,7 @@ from beanie import init_beanie
 from mumundo.backend.user import User
 import os
 from dotenv import load_dotenv
+import logging
 
 logger = logging.getLogger(__name__)
 
