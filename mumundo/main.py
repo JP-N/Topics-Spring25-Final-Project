@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
-from mumundo.backend.auth import router as auth_router
-from mumundo.backend.music import music_router
-from mumundo.backend.user import User
-from mumundo.backend.db import init_db
+from mumundo.api.auth import router as auth_router
+from mumundo.api.routers.music import music_router
+from mumundo.api.models.user import User
+from mumundo.api.db import init_db
 import logging
 
 logging.basicConfig(
