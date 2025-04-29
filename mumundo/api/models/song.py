@@ -14,8 +14,10 @@ class Song(Document):
 
     def rating(self):
         return self.likes / max(self.dislikes, 1)
+        
     class Settings:
         name = "song"
 
 class SongRequest(BaseModel):
     Spotify_id: int
+    Image_url: Optional[str] = None
