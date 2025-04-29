@@ -1,9 +1,9 @@
 from typing import List
 from fastapi import APIRouter, HTTPException
 from models.playlist import Playlist, PlaylistRequest
-from models.song import Song
+from mumundo.models.song import Song
 
-from playlist import Playlist
+from mumundo.models.playlist import Playlist
 
 playlist_router = APIRouter()
 
