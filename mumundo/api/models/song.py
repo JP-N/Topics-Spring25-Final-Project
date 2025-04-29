@@ -3,21 +3,17 @@ from pydantic import BaseModel
 
 
 class Song(Document):
-    #no id, we'll use MongoDB self generated id
-    Likes: int
-    Dislikes: int
-    Playlist_count: int
-    Rating: int
-    Genre: str
-    Length: int
+    Spotify_id: int
+    Likes: int = 0
+    Dislikes: int = 0
+    Playlist_count: int = 0
+    Genre: str | None
+    Length: int # in seconds
 
+    def rating(self):
+        return self.likes / max(self.dislikes, 1)
     class Settings:
         name = "song"
 
 class SongRequest(BaseModel):
-    Likes: int
-    Dislikes: int
-    Playlist_count: int
-    Rating: int
-    Genre: str
-    Length: int
+    Spotify_id: int
