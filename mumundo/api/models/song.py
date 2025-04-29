@@ -7,6 +7,7 @@ class Song(Document):
     Title: str
     Artist: str
     Length: int # in seconds
+    Image_url: Optional[str] = None
     Likes: int = 0
     Dislikes: int = 0
     Playlist_count: int = 0
