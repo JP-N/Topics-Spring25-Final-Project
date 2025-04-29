@@ -3,11 +3,13 @@ from pydantic import BaseModel
 
 
 class Song(Document):
-    songid: int
+    #no id, we'll use MongoDB self generated id
     Likes: int
     Dislikes: int
     Playlist_count: int
     Rating: int
+    Genre: str
+    Length: int
 
     class Settings:
         name = "song"
@@ -17,3 +19,5 @@ class SongRequest(BaseModel):
     Dislikes: int
     Playlist_count: int
     Rating: int
+    Genre: str
+    Length: int
