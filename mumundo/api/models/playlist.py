@@ -1,7 +1,7 @@
 from beanie import Document, Link
 from pydantic import BaseModel
 from typing import List
-from models.song import Song
+from mumundo.models.song import Song
 
 
 class Playlist(Document):
