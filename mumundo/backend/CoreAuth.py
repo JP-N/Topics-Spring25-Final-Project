@@ -1,19 +1,19 @@
-import os
 from datetime import datetime, timedelta
 from typing import Optional
-import logging
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
+from mumundo.backend.Logger import get_logger
+from mumundo.backend.models.user import User
+import bcrypt
 
-from mumundo.api.models.user import User
 # Logging
-logger = logging.getLogger(__name__)
+logger = get_logger("Authenticator")
 
 # Router
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+auth_router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # JWT settings and password hashing
 SECRET_KEY = "2a33c01bffbd1620f710c408f0a630f839e449b4c3356a15866347f9416bdef5"
@@ -52,6 +52,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
 async def get_user_by_email(email: str):
     return await User.find_one(User.email == email)
 
@@ -78,8 +85,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             raise credentials_exception
         token_data = TokenData(email=email)
     except:
-        raise credentials_exception
         logger.warning("Invalid token received during authentication")
+        raise credentials_exception
+
 
     logger.info(f"Token valid for user: {token_data.email}")
     user = await get_user_by_email(token_data.email)
@@ -91,7 +99,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 
 # Route for creating a new user
-@router.post("/register", response_model=Token)
+@auth_router.post("/register", response_model=Token)
 async def register(user_data: UserCreate):
 
     # Check if user already exists, if not create new entry
@@ -123,7 +131,7 @@ async def register(user_data: UserCreate):
 
 
 # Route for existing user login
-@router.post("/login", response_model=Token)
+@auth_router.post("/login", response_model=Token)
 async def login(form_data: UserLogin):
     user = await authenticate_user(form_data.email, form_data.password)
     logger.info(f"Login attempt for email: {form_data.email}")
@@ -144,7 +152,7 @@ async def login(form_data: UserLogin):
 
 
 # Token auth
-@router.get("/me")
+@auth_router.get("/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return {
         "email": current_user.email,

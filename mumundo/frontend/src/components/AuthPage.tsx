@@ -1,7 +1,6 @@
 import React, {useState} from 'react';
 import axios from 'axios';
 import {useNavigate} from 'react-router-dom';
-import MainLogo from '../assets/mumundosvgSVG.svg';
 
 interface FormData {
     email: string;
@@ -102,22 +101,7 @@ const AuthPage: React.FC = () => {
 
     return (
         <div className="min-h-screen flex flex-col bg-mumundoSnow">
-            <nav className="bg-mumundoRedLight font-medium drop-shadow-xl text-2xl text-mumundoBlackOlive">
-                <div className="mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-center h-20 items-center">
-                        <div className="flex items-center">
-                            <div className="flex items-center justify-center h-14">
-                                <img
-                                    className="h-full w-auto cursor-pointer"
-                                    src={MainLogo}
-                                    alt="Mumundo Logo"
-                                    onClick={() => navigate('/')}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </nav>
+
 
             <div className="flex-grow flex items-center justify-center py-4 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-md w-full space-y-32">
