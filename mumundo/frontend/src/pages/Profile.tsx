@@ -13,6 +13,7 @@ const Profile: React.FC = () => {
     const [error, setError] = useState('');
     const [profilePicture, setProfilePicture] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState('');
+    const [bio, setBio] = useState('');
 
     // Load user data
     useEffect(() => {
@@ -30,6 +31,7 @@ const Profile: React.FC = () => {
                 setUser(response.data);
                 setUsername(response.data.username);
                 setIsLoading(false);
+                setBio(response.data.bio || "");
             } catch (err) {
                 window.dispatchEvent(new Event('logout'));
                 navigate('/login');
@@ -63,6 +65,7 @@ const Profile: React.FC = () => {
 
             const formData = new FormData();
             formData.append('username', username);
+            formData.append('bio', bio);
             if (profilePicture) {
                 formData.append('profile_picture', profilePicture);
             }
@@ -107,7 +110,8 @@ const Profile: React.FC = () => {
                     <div className="flex items-center gap-4">
                         <div className="w-20 h-20 rounded-full overflow-hidden">
                             <img
-                                src={user?.profile_picture === 'default.jpg' ? '/default-profile.jpg' : `/uploads/${user?.profile_picture}`}
+                                //src={user?.profile_picture === 'default.jpg' ? '/default-profile.jpg' : `/uploads/${user?.profile_picture}`}
+                                src={user?.profile_picture_url || '/default-profile.jpg'}  //use profile_picture_url here
                                 alt="Profile"
                                 className="w-full h-full object-cover"
                             />
@@ -125,6 +129,12 @@ const Profile: React.FC = () => {
                             Edit Profile
                         </button>
                     </div>
+                    {user?.bio && (
+                        <div className="mt-4">
+                            <h3 className="text-lg font-semibold">Bio</h3>
+                            <p className="text-gray-600">{user?.bio}</p>
+                        </div>
+                    )}
                 </div>
             ) : (
 
@@ -148,7 +158,8 @@ const Profile: React.FC = () => {
                                     <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                                 ) : (
                                     <img
-                                        src={user?.profile_picture === 'default.jpg' ? '/default-profile.jpg' : `/uploads/${user?.profile_picture}`}
+                                        //src={user?.profile_picture === 'default.jpg' ? '/default-profile.jpg' : `/uploads/${user?.profile_picture}`}
+                                        src={user?.profile_picture_url ||'/default-profile.jpg'}
                                         alt="Current"
                                         className="w-full h-full object-cover"
                                     />

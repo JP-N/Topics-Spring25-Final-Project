@@ -9,6 +9,7 @@ class User(Document):
     hashed_password: str
     profile_picture: str = "default.jpg"
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    bio: Optional[str] = ""
 
     # Spotify integration fields
     spotify_id: Optional[str] = None

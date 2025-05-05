@@ -11,7 +11,7 @@ from mumundo.backend.CoreAuth import get_current_user
 logger = get_logger("Profile")
 profile_router = APIRouter(prefix="/user", tags=["user"])
 
-UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+UPLOAD_DIR = os.path.join(os.getcwd(), "backend", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @profile_router.get("/profile")
@@ -23,11 +23,19 @@ async def get_profile(user: User = Depends(get_current_user)):
     user_dict = user.dict()
     user_dict.pop("hashed_password", None)
 
+     #create the full URL for the profile picture
+    profile_picture_url = f"http://localhost:8000/uploads/{user.profile_picture}"
+    
+    #add the profile picture URL to the response data
+    user_dict["profile_picture_url"] = profile_picture_url
+
+
     return user_dict
 
 @profile_router.patch("/profile")
 async def update_profile(
         username: str = Form(...),
+        bio: str = Form(""),
         profile_picture: UploadFile = File(None),
         user: User = Depends(get_current_user)
 ):
@@ -35,7 +43,11 @@ async def update_profile(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     # Update in MongoDB
-    update_data = {"username": username}
+    update_data = {
+        "username": username,
+        "bio": bio,
+    }
+
 
     if profile_picture and profile_picture.filename:
 

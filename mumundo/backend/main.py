@@ -1,6 +1,8 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 
 load_dotenv(dotenv_path=".env")
 
@@ -54,6 +56,11 @@ async def startup_event():
     except Exception as e:
         print(f"Error creating dummy user: {e}")
 
+
+UPLOAD_DIR = os.path.join(os.getcwd(), "backend", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 @app.get("/")
 def read_root():
