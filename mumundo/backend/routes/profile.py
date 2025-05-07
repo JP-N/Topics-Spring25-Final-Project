@@ -10,6 +10,7 @@ import uuid
 from mumundo.backend.models.user import User
 from mumundo.backend.CoreAuth import get_current_user
 from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
 
 # Load environment variables
 load_dotenv()
@@ -17,16 +18,21 @@ load_dotenv()
 # Logger initialization
 logger = get_logger("UserProfile")
 
+# Init MongoDB client
+
 # Router entry point
 profile_router = APIRouter(prefix="/user", tags=["user"])
 
 UPLOAD_DIR = os.path.join(os.getcwd(), "backend", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Init MongoDB client
-MONGODB_URI = os.getenv("MONGODB_URI")
-client = MongoClient(MONGODB_URI)
-db = client.UserDB
+async def init_db():
+    # Initialize the database connection
+    MONGODB_URI = os.getenv("MONGODB_URI")
+
+    client = AsyncIOMotorClient(MONGODB_URI)
+    db = client.MainDB
+    return db
 
 # GET route to fetch user profile
 @profile_router.get("/profile")
@@ -77,6 +83,7 @@ async def update_profile(
 
         update_data["profile_picture"] = unique_filename
 
+    db = await init_db()
     result = db.users.update_one(
         {"_id": PydanticObjectId(user.id)},
         {"$set": update_data}
@@ -91,8 +98,8 @@ async def update_profile(
 @profile_router.get("/profile-picture/{user_id}")
 async def get_profile_picture(user_id: str):
 
-    user = db.users.find_one({"_id": ObjectId(user_id)})
-    print(user)
+    db = await init_db()
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -115,7 +122,7 @@ async def get_profile_picture(user_id: str):
 # GET route to fetch user selected public playlists
 @profile_router.get("/selected-playlists")
 async def get_user_selected_playlists(user: User = Depends(get_current_user)):
-
+    db = await init_db()
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 

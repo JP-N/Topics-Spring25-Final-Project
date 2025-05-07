@@ -22,6 +22,7 @@ logger = get_logger("SpotifyIntegration")
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
 db = client.SpotifyDB
+Userdb = client.MainDB
 
 # Spotify API credentials (pls dont leak these are tied to me)
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
@@ -195,9 +196,9 @@ async def get_public_playlists():
 
     # BUG FIX: Something wrong with da profile pic displaying :(
     for playlist in public_playlists:
-        user_id = playlist.get("User")
-        user = db.users.find_one({"_id": ObjectId(user_id)})
 
+        user_id = playlist.get("User")
+        user = Userdb.users.find_one({"_id": ObjectId(user_id)})
         if user:
             user_info = UserInfo(
                 id=str(user["_id"]),
