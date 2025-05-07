@@ -1,3 +1,5 @@
+from aiohttp.web_fileresponse import FileResponse
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
 from pymongo import MongoClient
 from beanie import PydanticObjectId
@@ -13,6 +15,8 @@ profile_router = APIRouter(prefix="/user", tags=["user"])
 
 UPLOAD_DIR = os.path.join(os.getcwd(), "backend", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+db = MongoClient()
 
 @profile_router.get("/profile")
 async def get_profile(user: User = Depends(get_current_user)):
@@ -71,6 +75,30 @@ async def update_profile(
         raise HTTPException(status_code=400, detail="Update failed")
 
     return {"message": "Profile updated successfully"}
+
+@profile_router.get("/profile-picture/{user_id}")
+async def get_profile_picture(user_id: str):
+
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Get profile picture path
+    picture = user.get("profile_picture", "default.jpg")
+
+    # If it's the default picture, serve from static folder
+    if picture == "default.jpg":
+        return FileResponse("static/default-profile.jpg")
+
+    # Otherwise, serve from uploads folder
+    picture_path = os.path.join(UPLOAD_DIR, picture)
+    print(picture_path)
+    # Check if file exists
+    if not os.path.isfile(picture_path):
+        return FileResponse("static/default-profile.jpg")
+
+    return FileResponse(picture_path)
 
 @profile_router.get("/selected-playlists")
 async def get_user_selected_playlists(user: User = Depends(get_current_user)):

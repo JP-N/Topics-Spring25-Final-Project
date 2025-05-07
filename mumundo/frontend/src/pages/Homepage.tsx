@@ -89,7 +89,7 @@ const HomePage = () => {
                                         </p>
                                     </div>
 
-                                    {/* Spotify screenshot below, with a fancy border */}
+                                    {/* Spotify screenshot */}
                                     <div className="@container relative min-h-[30rem] w-full grow max-lg:mx-auto max-lg:max-w-sm">
                                         <div className="absolute inset-x-10 top-10 bottom-0 overflow-hidden rounded-t-[5cqw] border-x-[1cqw] border-t-[1cqw] border-gray-700 bg-gray-900 shadow-2xl">
                                             <img
@@ -102,7 +102,7 @@ const HomePage = () => {
                                 </div>
                             </div>
 
-                            {/* Spotify Integration section */}
+                            {/* Spotify Integration */}
                             <div className="relative col-start-3 max-lg:row-start-1">
                                 <div className="absolute inset-px rounded-lg bg-white max-lg:rounded-t-[2rem]"></div>
                                 <div className="relative flex h-full flex-col overflow-hidden rounded-[calc(var(--radius-lg)+1px)] max-lg:rounded-t-[calc(2rem+1px)]">

@@ -11,9 +11,9 @@ from mumundo.backend.MongoHandler import init_db
 from mumundo.backend.Logger import get_logger
 
 from mumundo.backend.CoreAuth import auth_router
-
-from mumundo.backend.routes.spotify_integration import spotify_router, playlist_router
-from mumundo.backend.routes.music import music_router
+from mumundo.backend.routes.admin import admin_router
+from mumundo.backend.routes.spotify_integration import playlist_router
+# from mumundo.backend.routes.music import music_router
 from mumundo.backend.routes.profile import profile_router
 
 logger = get_logger("MainServer")
@@ -28,13 +28,13 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-app.include_router(music_router, prefix="/music", tags=["music"])
+app.include_router(admin_router, prefix="/api")
+#app.include_router(music_router, prefix="/music", tags=["music"])
 app.include_router(profile_router, prefix="/api")
-app.include_router(spotify_router, prefix="/api")
 app.include_router(playlist_router, prefix="/api", tags=["playlists"])
 @app.on_event("startup")
 async def startup_event():
-    
+
     await init_db()
 
     try:

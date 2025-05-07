@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import SpotifySection from '../components/SpotifySection';
 import { useNavigate } from 'react-router-dom';
+import UserPlaylistsSection from "../components/UserPlaylists.tsx";
 
 const Profile: React.FC = () => {
     const navigate = useNavigate();
@@ -110,8 +111,7 @@ const Profile: React.FC = () => {
                     <div className="flex items-center gap-4">
                         <div className="w-20 h-20 rounded-full overflow-hidden">
                             <img
-                                //src={user?.profile_picture === 'default.jpg' ? '/default-profile.jpg' : `/uploads/${user?.profile_picture}`}
-                                src={user?.profile_picture_url || '/default-profile.jpg'}  //use profile_picture_url here
+                                src={user?.profile_picture_url || '/default-profile.jpg'}
                                 alt="Profile"
                                 className="w-full h-full object-cover"
                             />
@@ -151,6 +151,16 @@ const Profile: React.FC = () => {
                     </div>
 
                     <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1">Bio</label>
+                        <textarea
+                            value={bio}
+                            onChange={(e) => setBio(e.target.value)}
+                            className="w-full p-2 border rounded"
+                            rows={3}
+                        />
+                    </div>
+
+                    <div className="mb-4">
                         <label className="block text-sm font-medium mb-1">Profile Picture</label>
                         <div className="flex items-center gap-4">
                             <div className="w-16 h-16 rounded-full overflow-hidden">
@@ -158,7 +168,6 @@ const Profile: React.FC = () => {
                                     <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                                 ) : (
                                     <img
-                                        //src={user?.profile_picture === 'default.jpg' ? '/default-profile.jpg' : `/uploads/${user?.profile_picture}`}
                                         src={user?.profile_picture_url ||'/default-profile.jpg'}
                                         alt="Current"
                                         className="w-full h-full object-cover"
@@ -202,6 +211,7 @@ const Profile: React.FC = () => {
             )}
 
             <SpotifySection />
+            <UserPlaylistsSection />
         </div>
     );
 };

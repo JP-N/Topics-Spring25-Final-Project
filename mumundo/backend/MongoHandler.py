@@ -10,8 +10,6 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 full_uri = "mongodb+srv://jpnoga:dfdIQMOCMgYEB83N@mumundo.ecyyd6x.mongodb.net/?retryWrites=true&w=majority&appName=mumundo"
 
-
-
 async def init_db():
 
     global client, logs_client
@@ -30,12 +28,12 @@ async def init_db():
         logs_client = AsyncIOMotorClient(full_uri)
         logger.info("Logs database client created")
 
-        app_db = client["Cluster0"]
+        app_db = client["MainDB"]
         await init_beanie(database=app_db, document_models=[User])
         logger.info("Application database initialized with Beanie")
 
-
         return client
+
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
 import MainLogo from '../assets/mumundosvgSVG.svg';
 import axios from 'axios';
 
@@ -15,7 +15,9 @@ const Navbar: React.FC = () => {
     // Logout handler
     const handleLogout = () => {
         localStorage.removeItem('token');
+
         delete axios.defaults.headers.common['Authorization'];
+        window.dispatchEvent(new Event('auth-change'));
         window.dispatchEvent(new Event('logout'));
         navigate('/');
     };
@@ -27,11 +29,11 @@ const Navbar: React.FC = () => {
                     {/* Logo section */}
                     <div className="flex items-center">
                         <Link to="/" className="flex items-center justify-center h-14">
-                            <img className="h-full w-auto" src={MainLogo} alt="Mumundo Logo" />
+                            <img className="h-full w-auto" src={MainLogo} alt="Mumundo Logo"/>
                         </Link>
                     </div>
 
-                    {/* Navigation Links - Only show if authenticated */}
+                    {/* Navigation Links */}
                     {isAuthenticated && (
                         <div className="hidden md:flex items-center space-x-8">
                             <Link
@@ -69,26 +71,6 @@ const Navbar: React.FC = () => {
                     </div>
                 </div>
             </div>
-
-            {/* Mobile menu - Show only if authenticated */}
-            {isAuthenticated && (
-                <div className="md:hidden border-t border-mumundoRed">
-                    <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex justify-center">
-                        <Link
-                            to="/playlists"
-                            className="px-3 py-2 text-mumundoBlackOlive hover:text-mumundoRed transition-colors"
-                        >
-                            Shared Playlists
-                        </Link>
-                        <Link
-                            to="/profile"
-                            className="px-3 py-2 text-mumundoBlackOlive hover:text-mumundoRed transition-colors"
-                        >
-                            Profile
-                        </Link>
-                    </div>
-                </div>
-            )}
         </nav>
     );
 };

@@ -1,372 +1,106 @@
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from typing import List
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy.oauth2 import SpotifyClientCredentials
 from pymongo import MongoClient
-from beanie import Document, Link, PydanticObjectId
-from typing import List, Dict, Optional
-from pydantic import BaseModel, Field
-from datetime import datetime
+from bson import ObjectId
 import os
-from dotenv import load_dotenv
+import re
+from datetime import datetime
 
 from mumundo.backend.CoreAuth import get_current_user
-from mumundo.backend.models.song import Song
-
-load_dotenv(dotenv_path="mumundo/backend/.env")
-
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8000/api/spotify/callback")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-SPOTIFY_SCOPE = "user-read-private user-read-email playlist-read-private playlist-read-collaborative"
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
 db = client.Cluster0
 
-class Playlist(Document):
-    Title: str
-    User: str
-    Songs: List[Link[Song]]
-    Likes: int = 0
-    Dislikes: int = 0
-    Saves: int = 0
-    Total_Time: int = 0
-    spotify_id: Optional[str] = None
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 
-    def Time(self) -> float:
-        time = 0
-        for song in self.Songs:
-            time += song.Length
-        return time
+class RatingRequest(BaseModel):
+    type: str
 
-    def total_time_str(self) -> str:
-        total = self.Time()
-        hours, remainder = divmod(total, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        time_parts = []
-        if hours:
-            time_parts.append(f"{hours} hr")
-        if minutes:
-            time_parts.append(f"{minutes} min")
-        time_parts.append(f"{seconds} sec")
+class ReportRequest(BaseModel):
+    reason: str
 
-        return " ".join(time_parts)
+class SpotifyImportRequest(BaseModel):
+    playlistUrl: str
+    isPublic: bool = False
 
-    def Rating(self) -> float:
-        return self.Likes / max(self.Dislikes, 1)
+class UserInfo(BaseModel):
+    id: str
+    username: str
+    profilePicture: str = "default.jpg"
 
-    class Settings:
-        name = "playlist"
-
-class PlaylistRequest(BaseModel):
-    Title: str
-    User: str
-
-class SpotifyStatus(BaseModel):
-    linked: bool
-    username: Optional[str] = None
-
-class SpotifyPlaylist(BaseModel):
+class PlaylistDisplay(BaseModel):
     id: str
     name: str
-    images: List[Dict[str, str]]
-    tracks: Dict[str, int]
-
-class SelectedPlaylists(BaseModel):
-    playlistIds: List[str] = Field(default_factory=list)
-
-class SpotifyPlaylistImport(BaseModel):
-    playlist_id: str
-
-class PublicPlaylistResponse(BaseModel):
-    id: str
-    name: str
-    imageUrl: str
+    imageUrl: str = ""
     trackCount: int
-    user: dict
+    user: UserInfo
 
-def get_spotify_client(user_id: str):
-    user_data = db.users.find_one({"_id": PydanticObjectId(user_id)})
-
-    if not user_data or "spotify_refresh_token" not in user_data:
-        return None
-
-    auth_manager = SpotifyOAuth(
-        client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=SPOTIFY_SCOPE
-    )
-
-    token_info = auth_manager.refresh_access_token(user_data["spotify_refresh_token"])
-    return spotipy.Spotify(auth=token_info["access_token"])
-
-spotify_router = APIRouter(prefix="/spotify", tags=["spotify"])
 playlist_router = APIRouter(prefix="/playlists", tags=["playlist"])
 
-@spotify_router.get("/auth")
-async def spotify_auth(request: Request):
-    current_user = await get_current_user(request)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
 
-    request.session["user_id"] = str(current_user.id)
+@playlist_router.post("/import-spotify")
+async def import_spotify_playlist(
+        request: SpotifyImportRequest,
+        current_user = Depends(get_current_user)
+):
+    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Spotify API credentials not configured")
 
-    sp_oauth = SpotifyOAuth(
-        client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=SPOTIFY_SCOPE
-    )
+    if "spotify.com/playlist/" not in request.playlistUrl:
+        raise HTTPException(status_code=400, detail="Invalid Spotify playlist URL")
 
-    auth_url = sp_oauth.get_authorize_url()
+    playlist_id = request.playlistUrl.split('playlist/')[-1].split('?')[0]
 
-    return RedirectResponse(url=auth_url)
-
-@spotify_router.get("/callback")
-async def spotify_callback(request: Request, code: str):
-
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=auth_required")
-
-    sp_oauth = SpotifyOAuth(
-        client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=SPOTIFY_SCOPE
-    )
-
-    token_info = sp_oauth.get_access_token(code)
-
-    sp = spotipy.Spotify(auth=token_info["access_token"])
-
-    spotify_user = sp.current_user()
-
-    db.users.update_one(
-        {"_id": PydanticObjectId(user_id)},
-        {
-            "$set": {
-                "spotify_id": spotify_user["id"],
-                "spotify_display_name": spotify_user["display_name"],
-                "spotify_refresh_token": token_info["refresh_token"],
-                "spotify_linked_at": datetime.utcnow(),
-                "spotify_selected_playlists": []
-            }
-        }
-    )
-
-    return RedirectResponse(url=f"{FRONTEND_URL}/profile?spotify=success")
-
-@spotify_router.get("/status", response_model=SpotifyStatus)
-async def spotify_status(request: Request):
-    """Check if user has linked Spotify account"""
-    current_user = await get_current_user(request)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user_data = db.users.find_one({"_id": PydanticObjectId(current_user.id)})
-
-    if user_data and "spotify_refresh_token" in user_data:
-        return SpotifyStatus(
-            linked=True,
-            username=user_data.get("spotify_display_name")
+    sp = spotipy.Spotify(
+        auth_manager=SpotifyClientCredentials(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET
         )
-
-    return SpotifyStatus(linked=False)
-
-@spotify_router.get("/playlists", response_model=List[SpotifyPlaylist])
-async def get_spotify_playlists(request: Request):
-    """Get all playlists from user's Spotify account"""
-    current_user = await get_current_user(request)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    sp = get_spotify_client(str(current_user.id))
-    if not sp:
-        raise HTTPException(status_code=401, detail="Spotify account not linked")
-
-    results = sp.current_user_playlists()
-    playlists = results["items"]
-
-    while results["next"]:
-        results = sp.next(results)
-        playlists.extend(results["items"])
-
-    formatted_playlists = []
-    for playlist in playlists:
-        formatted_playlists.append(
-            SpotifyPlaylist(
-                id=playlist["id"],
-                name=playlist["name"],
-                images=playlist["images"],
-                tracks={"total": playlist["tracks"]["total"]}
-            )
-        )
-
-    return formatted_playlists
-
-@spotify_router.post("/selected-playlists")
-async def save_selected_playlists(selected: SelectedPlaylists, request: Request):
-
-    current_user = await get_current_user(request)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    db.users.update_one(
-        {"_id": PydanticObjectId(current_user.id)},
-        {"$set": {"spotify_selected_playlists": selected.playlistIds}}
     )
-
-    return {"message": "Selected playlists saved successfully"}
-
-@spotify_router.get("/selected-playlists", response_model=List[str])
-async def get_selected_playlists(request: Request):
-    current_user = await get_current_user(request)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user_data = db.users.find_one({"_id": PydanticObjectId(current_user.id)})
-
-    if not user_data:
-        return []
-
-    return user_data.get("spotify_selected_playlists", [])
-
-@playlist_router.get("/public", response_model=List[PublicPlaylistResponse])
-async def get_public_playlists():
-
-    users = list(db.users.find(
-        {"spotify_selected_playlists": {"$exists": True, "$ne": []}}
-    ))
-
-    if not users:
-        return []
-
-    public_playlists = []
-
-    for user in users:
-
-        if not user.get("spotify_refresh_token") or not user.get("spotify_selected_playlists"):
-            continue
-
-        sp = get_spotify_client(str(user["_id"]))
-
-        if not sp:
-            continue
-
-        for playlist_id in user.get("spotify_selected_playlists", []):
-            try:
-                playlist = sp.playlist(playlist_id)
-
-                public_playlists.append(
-                    PublicPlaylistResponse(
-                        id=playlist["id"],
-                        name=playlist["name"],
-                        imageUrl=playlist["images"][0]["url"] if playlist["images"] else "",
-                        trackCount=playlist["tracks"]["total"],
-                        user={
-                            "id": str(user["_id"]),
-                            "username": user["username"],
-                            "profilePicture": user.get("profile_picture", "default.jpg")
-                        }
-                    )
-                )
-            except Exception:
-                continue
-
-    return public_playlists
-
-@playlist_router.post("/", response_model=Playlist)
-async def create_playlist(data: PlaylistRequest):
-    """Create a new playlist"""
-    playlist = Playlist(Title=data.Title, User=data.User, Songs=[])
-    await playlist.insert()
-    return playlist
-
-@playlist_router.post("/{playlist_id}/add_music/{song_id}")
-async def add_song_to_playlist(playlist_id: str, song_id: str):
-    """Add a song to a playlist"""
-    playlist = await Playlist.get(playlist_id)
-    song = await Song.get(song_id)
-    if not playlist or not song:
-        raise HTTPException(404, "Playlist or Song not found.")
-    if song in playlist.Songs:
-        return {"message": "Song already in playlist."}
-    playlist.Songs.append(song)
-    await playlist.save()
-    return {"message": "Song added to playlist."}
-
-@playlist_router.post("/{playlist_id}/remove_song/{song_id}")
-async def remove_song_from_playlist(playlist_id: str, song_id: str):
-    """Remove a song from a playlist"""
-    playlist = await Playlist.get(playlist_id)
-    if not playlist:
-        raise HTTPException(404, "Playlist not found.")
-    playlist.Songs = [s for s in playlist.Songs if str(s.id) != song_id]
-    await playlist.save()
-    return {"message": "Song removed from playlist."}
-
-@playlist_router.get("/{playlist_id}", response_model=Playlist)
-async def get_playlist(playlist_id: str):
-    try:
-
-        playlist = await Playlist.get(playlist_id, fetch_links=True)
-    except Exception:
-        try:
-
-            playlist = await Playlist.get(PydanticObjectId(playlist_id), fetch_links=True)
-        except Exception:
-            raise HTTPException(404, "Playlist not found.")
-
-    if not playlist:
-        raise HTTPException(404, "Playlist not found.")
-
-    playlist.Total_Time = playlist.total_time_str()
-    return playlist
-
-@playlist_router.get("/", response_model=List[Playlist])
-async def get_all_playlists():
-    """Get all playlists"""
-    playlists = await Playlist.find_all(fetch_links=True).to_list()
-    for playlist in playlists:
-        playlist.Total_Time = playlist.total_time_str()
-    return playlists
-
-@playlist_router.post("/import-from-spotify")
-async def import_spotify_playlist(data: SpotifyPlaylistImport, request: Request):
-    current_user = await get_current_user(request)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    sp = get_spotify_client(str(current_user.id))
-    if not sp:
-        raise HTTPException(status_code=401, detail="Spotify account not linked")
 
     try:
-        playlist = sp.playlist(data.playlist_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Playlist not found")
+        playlist = sp.playlist(playlist_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Playlist not found: {str(e)}")
 
     tracks = []
-    results = sp.playlist_tracks(data.playlist_id)
+    results = sp.playlist_tracks(playlist_id)
     tracks.extend(results["items"])
 
     while results["next"]:
         results = sp.next(results)
         tracks.extend(results["items"])
 
-    new_playlist = Playlist(
-        Title=playlist["name"],
-        User=str(current_user.id),
-        Songs=[],
-        spotify_id=playlist["id"],
-        Total_Time=sum(track["track"]["duration_ms"] // 1000 for track in tracks if track["track"] and "duration_ms" in track["track"])
-    )
+    clean_name = re.sub(r'[\\/*?:"<>|]', "", playlist["name"])
 
-    await new_playlist.insert()
+    image_url = ""
+    if playlist["images"] and len(playlist["images"]) > 0:
+        image_url = playlist["images"][0]["url"]
+
+    new_playlist = {
+        "Title": clean_name,
+        "User": str(current_user.id),
+        "Songs": [],
+        "spotify_id": playlist["id"],
+        "IsPublic": request.isPublic,
+        "created_at": datetime.utcnow(),
+        "image_url": image_url,
+        "Likes": 0,
+        "Dislikes": 0,
+        "Saves": 0,
+        "Total_Time": 0
+    }
+
+    playlist_result = db.playlist.insert_one(new_playlist)
+    playlist_id = playlist_result.inserted_id
+
+    track_count = 0
+    total_time = 0
 
     for track_item in tracks:
         if not track_item["track"]:
@@ -374,72 +108,415 @@ async def import_spotify_playlist(data: SpotifyPlaylistImport, request: Request)
 
         track = track_item["track"]
 
-        existing_song = await Song.find_one({"spotify_id": track["id"]})
+        existing_song = db.song.find_one({"spotify_id": track["id"]})
 
         if not existing_song:
-
             artists = ", ".join([artist["name"] for artist in track["artists"]])
 
-            new_song = Song(
-                Title=track["name"],
-                Artist=artists,
-                Album=track["album"]["name"] if "album" in track else "",
-                Length=track["duration_ms"] // 1000,
-                spotify_id=track["id"],
-                preview_url=track.get("preview_url")
+            album_name = ""
+            album_image = ""
+            if "album" in track:
+                album_name = track["album"]["name"]
+                if track["album"]["images"] and len(track["album"]["images"]) > 0:
+                    album_image = track["album"]["images"][0]["url"]
+
+            new_song = {
+                "Title": track["name"],
+                "Artist": artists,
+                "Album": album_name,
+                "Length": track["duration_ms"] // 1000,
+                "spotify_id": track["id"],
+                "preview_url": track.get("preview_url"),
+                "image_url": album_image
+            }
+
+            song_result = db.song.insert_one(new_song)
+            song_id = song_result.inserted_id
+
+            db.playlist.update_one(
+                {"_id": playlist_id},
+                {"$push": {"Songs": ObjectId(song_id)}}
             )
 
-            await new_song.insert()
-            new_playlist.Songs.append(new_song)
+            total_time += new_song["Length"]
         else:
-            new_playlist.Songs.append(existing_song)
+            db.playlist.update_one(
+                {"_id": playlist_id},
+                {"$push": {"Songs": ObjectId(existing_song["_id"])}}
+            )
 
-    await new_playlist.save()
+            total_time += existing_song["Length"]
 
-    return {"message": "Playlist imported successfully", "playlist_id": str(new_playlist.id)}
+        track_count += 1
 
+    db.playlist.update_one(
+        {"_id": playlist_id},
+        {"$set": {"Total_Time": total_time}}
+    )
 
-
-@playlist_router.get("/spotify/{playlist_id}")
-async def get_spotify_playlist(playlist_id: str):
-
-    user = db.users.find_one({"spotify_selected_playlists": playlist_id})
-
-    if not user:
-        raise HTTPException(status_code=404, detail="Playlist not found")
-
-    sp = get_spotify_client(str(user["_id"]))
-
-    if not sp:
-        raise HTTPException(status_code=404, detail="Cannot access playlist")
-
-    playlist = sp.playlist(playlist_id)
-
-    tracks = []
-    results = sp.playlist_tracks(playlist_id, limit=100)
-
-    for item in results["items"]:
-        if item["track"]:
-            track = item["track"]
-            tracks.append({
-                "id": track["id"],
-                "name": track["name"],
-                "artists": [artist["name"] for artist in track["artists"]],
-                "album": track["album"]["name"],
-                "duration_ms": track["duration_ms"],
-                "preview_url": track.get("preview_url")
-            })
+    db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$push": {"playlists": str(playlist_id)}}
+    )
 
     return {
-        "id": playlist["id"],
-        "name": playlist["name"],
-        "description": playlist["description"],
-        "imageUrl": playlist["images"][0]["url"] if playlist["images"] else "",
-        "trackCount": playlist["tracks"]["total"],
-        "tracks": tracks,
-        "user": {
-            "id": str(user["_id"]),
-            "username": user["username"],
-            "profilePicture": user.get("profile_picture", "default.jpg")
-        }
+        "message": "Playlist imported successfully",
+        "playlist_id": str(playlist_id),
+        "title": clean_name,
+        "track_count": track_count,
+        "is_public": request.isPublic,
+        "image_url": image_url
     }
+
+@playlist_router.get("/public", response_model=List[PlaylistDisplay])
+async def get_public_playlists():
+    public_playlists = list(db.playlist.find({"IsPublic": True}))
+
+    if not public_playlists:
+        return []
+
+    response_playlists = []
+
+    for playlist in public_playlists:
+        user_id = playlist.get("User")
+        user = db.users.find_one({"_id": ObjectId(user_id)})
+
+        if user:
+            user_info = UserInfo(
+                id=str(user["_id"]),
+                username=user["username"],
+                profilePicture=user.get("profile_picture", "default.jpg")
+            )
+        else:
+            user_info = UserInfo(
+                id=str(user_id),
+                username="Unknown User",
+                profilePicture="default.jpg"
+            )
+
+        image_url = playlist.get("image_url", "")
+
+        track_count = len(playlist.get("Songs", []))
+
+        response_playlists.append(
+            PlaylistDisplay(
+                id=str(playlist["_id"]),
+                name=playlist["Title"],
+                imageUrl=image_url,
+                trackCount=track_count,
+                user=user_info
+            )
+        )
+
+    return response_playlists
+
+@playlist_router.get("/user")
+async def get_user_playlists(current_user = Depends(get_current_user)):
+    try:
+        print(f"Fetching playlists for user: {current_user.id}")
+        # Find all playlists for the current user
+        user_playlists = list(db.playlist.find({"User": str(current_user.id)}))
+
+        if not user_playlists:
+            return []
+
+        # Format the response
+        formatted_playlists = []
+
+        for playlist in user_playlists:
+            # Format playlist info
+            formatted_playlists.append({
+                "id": str(playlist["_id"]),
+                "name": playlist["Title"],
+                "imageUrl": playlist.get("image_url", ""),
+                "trackCount": len(playlist.get("Songs", [])),
+                "isPublic": playlist.get("IsPublic", False)
+            })
+
+        return formatted_playlists
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching user playlists: {str(e)}"
+        )
+
+
+@playlist_router.get("/{playlist_id}")
+async def get_playlist_detail(playlist_id: str):
+    try:
+        playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
+
+        if not playlist:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+
+        # Get user info
+        user_id = playlist.get("User")
+        user = db.users.find_one({"_id": ObjectId(user_id)})
+
+        if user:
+            user_info = {
+                "id": str(user["_id"]),
+                "username": user["username"],
+                "profilePicture": user.get("profile_picture", "default.jpg")
+            }
+        else:
+            user_info = {
+                "id": str(user_id),
+                "username": "Unknown User",
+                "profilePicture": "default.jpg"
+            }
+
+        # Get songs
+        songs_data = []
+        song_ids = [ObjectId(song_id) for song_id in playlist.get("Songs", [])]
+
+        if song_ids:
+            songs = list(db.song.find({"_id": {"$in": song_ids}}))
+
+            for song in songs:
+                songs_data.append({
+                    "id": str(song["_id"]),
+                    "name": song["Title"],
+                    "artists": [song["Artist"]],
+                    "album": song["Album"],
+                    "duration_ms": song["Length"] * 1000,
+                    "preview_url": song.get("preview_url"),
+                    "image_url": song.get("image_url", "")
+                })
+
+        # Format time
+        total_time = playlist.get("Total_Time", 0)
+        hours, remainder = divmod(total_time, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        time_parts = []
+        if hours:
+            time_parts.append(f"{int(hours)} hr")
+        if minutes:
+            time_parts.append(f"{int(minutes)} min")
+        if seconds or not time_parts:
+            time_parts.append(f"{int(seconds)} sec")
+        formatted_time = " ".join(time_parts)
+
+        # Return formatted playlist
+        return {
+            "id": str(playlist["_id"]),
+            "name": playlist["Title"],
+            "description": playlist.get("Description", ""),
+            "imageUrl": playlist.get("image_url", ""),
+            "trackCount": len(song_ids),
+            "tracks": songs_data,
+            "user": user_info,
+            "total_time": formatted_time,
+            "is_public": playlist.get("IsPublic", False),
+            "created_at": playlist.get("created_at", "").isoformat() if playlist.get("created_at") else None,
+            "likes": playlist.get("Likes", 0),
+            "dislikes": playlist.get("Dislikes", 0)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Error fetching playlist: {str(e)}")
+
+@playlist_router.patch("/{playlist_id}/visibility")
+async def update_playlist_visibility(
+        playlist_id: str,
+        data: dict,
+        current_user = Depends(get_current_user)
+):
+    try:
+        # Find the playlist
+        playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
+
+        if not playlist:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+
+        # Verify ownership
+        if playlist["User"] != str(current_user.id):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to modify this playlist"
+            )
+
+        # Update visibility
+        is_public = data.get("isPublic", False)
+
+        db.playlist.update_one(
+            {"_id": ObjectId(playlist_id)},
+            {"$set": {"IsPublic": is_public}}
+        )
+
+        return {"message": "Playlist visibility updated", "isPublic": is_public}
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating playlist visibility: {str(e)}"
+        )
+
+@playlist_router.delete("/{playlist_id}")
+async def delete_playlist(
+        playlist_id: str,
+        current_user = Depends(get_current_user)
+):
+    playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
+
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    # Check if user is owner or admin
+    is_owner = playlist["User"] == str(current_user.id)
+    is_admin = hasattr(current_user, "is_admin") and current_user.is_admin
+
+    if not (is_owner or is_admin):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    # Delete playlist
+    db.playlist.delete_one({"_id": ObjectId(playlist_id)})
+
+    # Remove playlist from user's playlists
+    db.users.update_one(
+        {"_id": ObjectId(playlist["User"])},
+        {"$pull": {"playlists": str(playlist_id)}}
+    )
+
+    return {"message": "Playlist deleted successfully"}
+
+@playlist_router.post("/{playlist_id}/ratings")
+async def rate_playlist(
+        playlist_id: str,
+        rating: RatingRequest,
+        current_user = Depends(get_current_user)
+):
+    if rating.type not in ["like", "dislike"]:
+        raise HTTPException(status_code=400, detail="Rating must be 'like' or 'dislike'")
+
+    playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    # Check for existing rating
+    existing_rating = db.playlist_ratings.find_one({
+        "playlist_id": str(playlist_id),
+        "user_id": str(current_user.id)
+    })
+
+    if existing_rating:
+        # Update existing rating
+        if existing_rating["type"] != rating.type:
+            # Update counts in playlist
+            update_fields = {}
+            if existing_rating["type"] == "like":
+                update_fields["Likes"] = playlist["Likes"] - 1
+            else:
+                update_fields["Dislikes"] = playlist["Dislikes"] - 1
+
+            if rating.type == "like":
+                update_fields["Likes"] = playlist["Likes"] + 1
+            else:
+                update_fields["Dislikes"] = playlist["Dislikes"] + 1
+
+            db.playlist.update_one(
+                {"_id": ObjectId(playlist_id)},
+                {"$set": update_fields}
+            )
+
+            # Update rating
+            db.playlist_ratings.update_one(
+                {"_id": existing_rating["_id"]},
+                {"$set": {"type": rating.type, "updated_at": datetime.utcnow()}}
+            )
+
+        return {"message": "Rating updated", "type": rating.type}
+    else:
+        # Create new rating
+        db.playlist_ratings.insert_one({
+            "playlist_id": str(playlist_id),
+            "user_id": str(current_user.id),
+            "type": rating.type,
+            "created_at": datetime.utcnow()
+        })
+
+        # Update counts in playlist
+        update_field = "Likes" if rating.type == "like" else "Dislikes"
+        db.playlist.update_one(
+            {"_id": ObjectId(playlist_id)},
+            {"$inc": {update_field: 1}}
+        )
+
+        return {"message": "Rating added", "type": rating.type}
+
+@playlist_router.delete("/{playlist_id}/ratings")
+async def delete_rating(
+        playlist_id: str,
+        current_user = Depends(get_current_user)
+):
+    playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    # Find existing rating
+    existing_rating = db.playlist_ratings.find_one({
+        "playlist_id": str(playlist_id),
+        "user_id": str(current_user.id)
+    })
+
+    if not existing_rating:
+        raise HTTPException(status_code=404, detail="No rating found")
+
+    # Update playlist counts
+    update_field = "Likes" if existing_rating["type"] == "like" else "Dislikes"
+    db.playlist.update_one(
+        {"_id": ObjectId(playlist_id)},
+        {"$inc": {update_field: -1}}
+    )
+
+    # Delete rating
+    db.playlist_ratings.delete_one({"_id": existing_rating["_id"]})
+
+    return {"message": "Rating removed"}
+
+@playlist_router.get("/{playlist_id}/ratings")
+async def get_ratings(
+        playlist_id: str,
+        current_user = Depends(get_current_user)
+):
+    playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    # Get user's rating
+    user_rating = db.playlist_ratings.find_one({
+        "playlist_id": str(playlist_id),
+        "user_id": str(current_user.id)
+    })
+
+    rating_type = user_rating["type"] if user_rating else None
+
+    return {
+        "likes": playlist["Likes"],
+        "dislikes": playlist["Dislikes"],
+        "user_rating": rating_type
+    }
+
+@playlist_router.post("/{playlist_id}/report")
+async def report_playlist(
+        playlist_id: str,
+        report: ReportRequest,
+        current_user = Depends(get_current_user)
+):
+    playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    # Create report
+    db.playlist_reports.insert_one({
+        "playlist_id": str(playlist_id),
+        "user_id": str(current_user.id),
+        "reason": report.reason,
+        "created_at": datetime.utcnow(),
+        "status": "pending"  # pending, reviewed, dismissed
+    })
+
+    return {"message": "Report submitted successfully"}

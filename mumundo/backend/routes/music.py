@@ -4,14 +4,15 @@ from typing import List
 import requests
 import os
 from dotenv import load_dotenv
-
+from pymongo import MongoClient
 from mumundo.backend.models.song import Song
 from mumundo.backend.CoreAuth import get_current_user
-from mumundo.backend.routes.spotify_integration import get_spotify_client
+
+
 
 # Load environment variables
 load_dotenv()
-
+db = MongoClient(os.getenv("MONGO_URI")).get_database("mumundo")
 # Spotify API credentials
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")

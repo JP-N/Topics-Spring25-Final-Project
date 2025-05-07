@@ -22,12 +22,11 @@ const PublicPlaylists: React.FC = () => {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.has('spotify') && params.get('spotify') === 'success') {
-            // Clear URL parameters
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     }, []);
 
-    // Load all public playlists
+    // Load public playlists
     useEffect(() => {
         const fetchPublicPlaylists = async () => {
             try {
@@ -108,9 +107,10 @@ const PublicPlaylists: React.FC = () => {
                                 <div className="flex items-center space-x-2">
                                     <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
                                         <img
-                                            src={playlist.user.profilePicture === 'default.jpg' ? '/default-profile.jpg' : `/uploads/${playlist.user.profilePicture}`}
+                                            src={`/api/user/profile-picture/${playlist.user.id}`}
                                             alt={playlist.user.username}
                                             className="w-full h-full object-cover"
+
                                         />
                                     </div>
                                     <Link
