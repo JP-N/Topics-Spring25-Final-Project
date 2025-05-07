@@ -8,15 +8,27 @@ from bson import ObjectId
 import os
 import re
 from datetime import datetime
-
+from dotenv import load_dotenv
 from mumundo.backend.CoreAuth import get_current_user
+from mumundo.backend.Logger import get_logger
 
+# Load environment variables
+load_dotenv()
+
+# Logger initialization
+logger = get_logger("SpotifyIntegration")
+
+# Init MongoDB client
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
-db = client.Cluster0
+db = client.SpotifyDB
 
+# Spotify API credentials (pls dont leak these are tied to me)
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+
+# Router entry point
+
 
 class RatingRequest(BaseModel):
     type: str
@@ -41,13 +53,14 @@ class PlaylistDisplay(BaseModel):
     user: UserInfo
 
 playlist_router = APIRouter(prefix="/playlists", tags=["playlist"])
-
-
+# POST route to import Spotify playlists to user account
 @playlist_router.post("/import-spotify")
 async def import_spotify_playlist(
         request: SpotifyImportRequest,
         current_user = Depends(get_current_user)
-):
+    ):
+
+    # Basic checks for creds and valid url
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Spotify API credentials not configured")
 
@@ -76,6 +89,7 @@ async def import_spotify_playlist(
         results = sp.next(results)
         tracks.extend(results["items"])
 
+    # Clean up the playlist name to avoid invalid characters
     clean_name = re.sub(r'[\\/*?:"<>|]', "", playlist["name"])
 
     image_url = ""
@@ -168,8 +182,10 @@ async def import_spotify_playlist(
         "image_url": image_url
     }
 
+# GET route to fetch public playlists
 @playlist_router.get("/public", response_model=List[PlaylistDisplay])
 async def get_public_playlists():
+
     public_playlists = list(db.playlist.find({"IsPublic": True}))
 
     if not public_playlists:
@@ -177,6 +193,7 @@ async def get_public_playlists():
 
     response_playlists = []
 
+    # BUG FIX: Something wrong with da profile pic displaying :(
     for playlist in public_playlists:
         user_id = playlist.get("User")
         user = db.users.find_one({"_id": ObjectId(user_id)})
@@ -210,21 +227,20 @@ async def get_public_playlists():
 
     return response_playlists
 
+# GET route to fetch playlists for the current user
 @playlist_router.get("/user")
 async def get_user_playlists(current_user = Depends(get_current_user)):
     try:
-        print(f"Fetching playlists for user: {current_user.id}")
+
         # Find all playlists for the current user
         user_playlists = list(db.playlist.find({"User": str(current_user.id)}))
 
         if not user_playlists:
             return []
 
-        # Format the response
         formatted_playlists = []
 
         for playlist in user_playlists:
-            # Format playlist info
             formatted_playlists.append({
                 "id": str(playlist["_id"]),
                 "name": playlist["Title"],
@@ -241,16 +257,16 @@ async def get_user_playlists(current_user = Depends(get_current_user)):
             detail=f"Error fetching user playlists: {str(e)}"
         )
 
-
+# GET route to fetch playlist details
 @playlist_router.get("/{playlist_id}")
 async def get_playlist_detail(playlist_id: str):
+
     try:
         playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
 
         if not playlist:
             raise HTTPException(status_code=404, detail="Playlist not found")
 
-        # Get user info
         user_id = playlist.get("User")
         user = db.users.find_one({"_id": ObjectId(user_id)})
 
@@ -317,12 +333,14 @@ async def get_playlist_detail(playlist_id: str):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Error fetching playlist: {str(e)}")
 
+# PATCH route to update playlist visibility
 @playlist_router.patch("/{playlist_id}/visibility")
 async def update_playlist_visibility(
         playlist_id: str,
         data: dict,
         current_user = Depends(get_current_user)
-):
+    ):
+
     try:
         # Find the playlist
         playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
@@ -347,19 +365,19 @@ async def update_playlist_visibility(
 
         return {"message": "Playlist visibility updated", "isPublic": is_public}
 
-    except HTTPException as e:
-        raise e
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Error updating playlist visibility: {str(e)}"
         )
 
+# DELETE route to delete a playlist
 @playlist_router.delete("/{playlist_id}")
 async def delete_playlist(
         playlist_id: str,
         current_user = Depends(get_current_user)
-):
+    ):
+
     playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
 
     if not playlist:
@@ -374,8 +392,6 @@ async def delete_playlist(
 
     # Delete playlist
     db.playlist.delete_one({"_id": ObjectId(playlist_id)})
-
-    # Remove playlist from user's playlists
     db.users.update_one(
         {"_id": ObjectId(playlist["User"])},
         {"$pull": {"playlists": str(playlist_id)}}
@@ -383,12 +399,14 @@ async def delete_playlist(
 
     return {"message": "Playlist deleted successfully"}
 
+# POST route to rate a playlist
 @playlist_router.post("/{playlist_id}/ratings")
 async def rate_playlist(
         playlist_id: str,
         rating: RatingRequest,
         current_user = Depends(get_current_user)
-):
+    ):
+
     if rating.type not in ["like", "dislike"]:
         raise HTTPException(status_code=400, detail="Rating must be 'like' or 'dislike'")
 
@@ -430,7 +448,6 @@ async def rate_playlist(
 
         return {"message": "Rating updated", "type": rating.type}
     else:
-        # Create new rating
         db.playlist_ratings.insert_one({
             "playlist_id": str(playlist_id),
             "user_id": str(current_user.id),
@@ -438,7 +455,6 @@ async def rate_playlist(
             "created_at": datetime.utcnow()
         })
 
-        # Update counts in playlist
         update_field = "Likes" if rating.type == "like" else "Dislikes"
         db.playlist.update_one(
             {"_id": ObjectId(playlist_id)},
@@ -447,11 +463,13 @@ async def rate_playlist(
 
         return {"message": "Rating added", "type": rating.type}
 
+# DELETE route to remove a rating
 @playlist_router.delete("/{playlist_id}/ratings")
 async def delete_rating(
         playlist_id: str,
         current_user = Depends(get_current_user)
-):
+    ):
+
     playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
@@ -465,23 +483,23 @@ async def delete_rating(
     if not existing_rating:
         raise HTTPException(status_code=404, detail="No rating found")
 
-    # Update playlist counts
     update_field = "Likes" if existing_rating["type"] == "like" else "Dislikes"
     db.playlist.update_one(
         {"_id": ObjectId(playlist_id)},
         {"$inc": {update_field: -1}}
     )
 
-    # Delete rating
     db.playlist_ratings.delete_one({"_id": existing_rating["_id"]})
 
     return {"message": "Rating removed"}
 
+# GET route to fetch ratings for a playlist
 @playlist_router.get("/{playlist_id}/ratings")
 async def get_ratings(
         playlist_id: str,
         current_user = Depends(get_current_user)
-):
+    ):
+
     playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
@@ -500,12 +518,14 @@ async def get_ratings(
         "user_rating": rating_type
     }
 
+# POST route to report a playlist
 @playlist_router.post("/{playlist_id}/report")
 async def report_playlist(
         playlist_id: str,
         report: ReportRequest,
         current_user = Depends(get_current_user)
-):
+    ):
+
     playlist = db.playlist.find_one({"_id": ObjectId(playlist_id)})
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
@@ -516,7 +536,7 @@ async def report_playlist(
         "user_id": str(current_user.id),
         "reason": report.reason,
         "created_at": datetime.utcnow(),
-        "status": "pending"  # pending, reviewed, dismissed
+        "status": "pending"
     })
 
     return {"message": "Report submitted successfully"}

@@ -52,8 +52,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-
-
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
@@ -97,8 +95,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     return user
 
-
-# Route for creating a new user
+# POST route for creating a new user
 @auth_router.post("/register", response_model=Token)
 async def register(user_data: UserCreate):
 
@@ -111,7 +108,6 @@ async def register(user_data: UserCreate):
             detail="Email already registered"
         )
 
-
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
         email=user_data.email,
@@ -121,6 +117,7 @@ async def register(user_data: UserCreate):
 
     await new_user.insert()
     logger.info(f"Successfully registered user: {user_data.email}")
+
     # Create and return access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -129,10 +126,10 @@ async def register(user_data: UserCreate):
 
     return {"access_token": access_token, "token_type": "bearer"}
 
-
-# Route for existing user login
+# POST route for user login
 @auth_router.post("/login", response_model=Token)
 async def login(form_data: UserLogin):
+
     user = await authenticate_user(form_data.email, form_data.password)
     logger.info(f"Login attempt for email: {form_data.email}")
     if not user:
@@ -150,8 +147,7 @@ async def login(form_data: UserLogin):
     logger.info(f"User logged in successfully: {form_data.email}")
     return {"access_token": access_token, "token_type": "bearer"}
 
-
-# Token auth
+# GET route to fetch current user info
 @auth_router.get("/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return {

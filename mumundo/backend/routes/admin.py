@@ -5,15 +5,19 @@ from typing import List
 from datetime import datetime
 from pymongo import MongoClient
 from mumundo.backend.CoreAuth import get_current_user
-from mumundo.backend.MongoHandler import
+from dotenv import load_dotenv
 
+load_dotenv()
 
-
-global db
-db = await init_db()
+# Load env variables
+MONGODB_URI = os.getenv("MONGODB_URI")
+client = MongoClient(MONGODB_URI)
+db = client.AdminDB
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+# GET route for reports on playlists
 @admin_router.get("/reports")
 async def get_reports(current_user = Depends(get_current_user)):
     # Check if user is admin
@@ -28,6 +32,7 @@ async def get_reports(current_user = Depends(get_current_user)):
 
     formatted_reports = []
 
+    # Iterate through reports and fetch playlist and user info from MongoDB
     for report in reports:
 
         playlist = db.playlist.find_one({"_id": ObjectId(report["playlist_id"])})
@@ -47,6 +52,7 @@ async def get_reports(current_user = Depends(get_current_user)):
 
     return formatted_reports
 
+# POST route to dismiss a report
 @admin_router.post("/reports/{report_id}/dismiss")
 async def dismiss_report(report_id: str, current_user = Depends(get_current_user)):
     # Check if user is admin
@@ -64,6 +70,7 @@ async def dismiss_report(report_id: str, current_user = Depends(get_current_user
 
     return {"message": "Report dismissed"}
 
+# POST route to delete a reported playlist
 @admin_router.post("/reports/{report_id}/delete")
 async def delete_reported_playlist(report_id: str, current_user = Depends(get_current_user)):
 
@@ -82,7 +89,7 @@ async def delete_reported_playlist(report_id: str, current_user = Depends(get_cu
 
     db.playlist.delete_one({"_id": ObjectId(report["playlist_id"])})
 
-    # Remove playlist from user's playlists
+    # Remove playlist from the offending user's playlists
     db.users.update_one(
         {"_id": ObjectId(playlist["User"])},
         {"$pull": {"playlists": str(report["playlist_id"])}}

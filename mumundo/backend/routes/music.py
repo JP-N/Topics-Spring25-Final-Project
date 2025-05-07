@@ -9,10 +9,14 @@ from mumundo.backend.models.song import Song
 from mumundo.backend.CoreAuth import get_current_user
 
 
-
-# Load environment variables
 load_dotenv()
-db = MongoClient(os.getenv("MONGO_URI")).get_database("mumundo")
+
+# Load env variables
+MONGODB_URI = os.getenv("MONGODB_URI")
+client = MongoClient(MONGODB_URI)
+db = client.MusicDB
+
+
 # Spotify API credentials
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
