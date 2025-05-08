@@ -1,8 +1,8 @@
 import pytest
-from backend.models.user import User
+from mumundo.backend.models.user import User
 
 @pytest.mark.asyncio
-async def test_create_user():
+async def test_create_user(test_db):
     user = User(
         email="test@example.com",
         username="testuser",
