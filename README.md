@@ -83,7 +83,7 @@ A user is considered an admin on MUMUNDO if they have a red Administrator tag on
 ## **Backend Setup**
 The backend of MUMUNDO was built with FastAPI. It features a MongoDB-backed data layer with models like `User` and `Song`, and includes API routes for authentication (`CoreAuth.py`), user profiles (`profile.py`), music data (`music.py`), admin tools (`admin.py`), and Spotify playlist integration (`spotify_integration.py`). The backend supports static file uploads, centralized logging via `Logger.py`, and database intialization with `MongoHandler.py`.
 
-## **MongoDB Database
+## **MongoDB Database**
 The database consists of the following collections:
 ### MainDB
 
