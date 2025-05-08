@@ -1,13 +1,25 @@
 # Topics-Spring25
 Repository for **Topics In Computer Science: Web Application Development With Python** for Spring 2025.
 
-# **MUMUNDO: A Music Collection Management App**
+# **MUMUNDO: Share Playlists, Discover Music**
 
-## **History of MUMUNDO**
-MUMUNDO was originally an idea I came up with in my Human-Computer Interaction class. MUMUNDO is currently a personal music list where users can post music entrys consisting of a song title, an artist's name and a description, however, in the future, and my original intention for MUMUMUNDO, was for it to become a community-driven platform to share and discuss music, inspired by current music review sites like AOTY (Artist of the Year) and RYM (Rate Your Music), but also from social medias like Twitter (X) and Reddit. MUMUNDO is derived from taking the first two words of the word music and mundo (world in spanish).
+## **About MUMUNDO**
+MUMUNDO is derived by blending the first two syllables of "music" (mu-) with the Spanish world "mundo" (meaning world), symbolizing a global community connected through music. MUMUNDO is a music-focused platform that helps users grow their online community by sharing Spotify playlists. Connect your Spotify accound, select which playlists to share, and explore music curated by real people. With built-in Spotify integration, users can preview tracks directly in the browser and connect with others through a shared love of music.
 
-## **Project Overview**
-As stated previously, MUMUNDO is a personal music collection where the user can add a music entry (song title, artist name, and description) to a playlist. The user will be able to see their music collection as they add songs, and they will be able to go back and edit and/or delete their music entrys.
+Initalizing MUMUNDO (on windows)
+1. Create a Python virtual environment
+<pre> ```bash uvicorn mumundo.backend.main:app --reload ``` </pre>
+<pre>
+  ```python -m venv venv
+  .\venv\Scripts\activate ```
+</pre>
+
+
+## **Frontend Code**
+
+
+
+
 
 ### **Adding Music Entry and Reading Music Collection**
 To add music, the user will be prompted to add a song title, an artist name, and a description. The user could perhaps write an opinion, a review, it's really up to the user on what they want to write about their music entry. Once the user is finished putting in their input, they can click to add the music entry to the music collection, which will pop up below. The user will be able to read their music collection as they add songs.
