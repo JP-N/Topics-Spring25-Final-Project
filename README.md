@@ -6,20 +6,7 @@ Repository for **Topics In Computer Science: Web Application Development With Py
 ## **About MUMUNDO**
 MUMUNDO is derived by blending the first two syllables of "music" (mu-) with the Spanish world "mundo" (meaning world), symbolizing a global community connected through music. MUMUNDO is a music-focused platform that helps users grow their online community by sharing Spotify playlists. Connect your Spotify accound, select which playlists to share, and explore music curated by real people. With built-in Spotify integration, users can preview tracks directly in the browser and connect with others through a shared love of music.
 
-Initalizing MUMUNDO (on windows)
-1. Create a Python virtual environment
-<pre> ```bash uvicorn mumundo.backend.main:app --reload ``` </pre>
-<pre>
-  ```python -m venv venv
-  .\venv\Scripts\activate ```
-</pre>
-
-
 ## **Frontend Code**
-
-
-
-
 
 ### **Adding Music Entry and Reading Music Collection**
 To add music, the user will be prompted to add a song title, an artist name, and a description. The user could perhaps write an opinion, a review, it's really up to the user on what they want to write about their music entry. Once the user is finished putting in their input, they can click to add the music entry to the music collection, which will pop up below. The user will be able to read their music collection as they add songs.
