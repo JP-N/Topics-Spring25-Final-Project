@@ -1,13 +1,14 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+import pytest_asyncio
+import mongomock_motor
 from beanie import init_beanie
-from backend.models.user import User
+from mumundo.backend.models.user import User
 
-TEST_DB_URL = "mongodb://localhost:27018/test_db"
-
-@pytest.fixture(scope="function", autouse=True)
+@pytest_asyncio.fixture(scope="function")
 async def test_db():
-    client = AsyncIOMotorClient(TEST_DB_URL)
-    db = client.get_default_database()
+    client = mongomock_motor.AsyncMongoMockClient()
+    db = client["test_db"]
+    print("init")
+
     await init_beanie(database=db, document_models=[User])
-    yield
-    await db.client.drop_database("test_db")
+    
+    yield db
