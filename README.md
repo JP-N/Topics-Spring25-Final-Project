@@ -50,34 +50,34 @@ When a user clicks the Sign in button, they are redirected to the sign-in page. 
 
 As previously mentioned, if the user hasn't register for an account with MUMUNDO, the user will be prompted to sign up for an account. Error prevention protocols have also been placed here.
 
-[!User Sign Up](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/signup.PNG?raw=true)
+[!User Sign Up](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/signup.PNG?)
 
 ### **User Profile Page**
 Once the user has successfully sign-up/logged in, the user will be redirected to the main page. The user can access the profile page by clicking on Profile on the top center portion of the page. The default profile page has the default MUMUNDO profile picture icon next to the user's username and email, where the user has the option to change the profile picture and add a bio to their profile page. The user also has the option to import Spotify playlists on the profile page, by adding a Spotify Playlist URL to the designated field, and when they click Import Playlist, the playlist will appear below under Your Playlists.
 
-[!User Profile Edit](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/editprofile.PNG?raw=true)
+[!User Profile Edit](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/editprofile.PNG?raw=true)
 
-[!User Main Profile Page](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/profile.PNG?raw=true)
+[!User Main Profile Page](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/profile.PNG?raw=true)
 
 ### **Spotify Playlists**
 When a user imports a playlist, they have the option of making their playlist private or public to users. The user is also able to view playlists, thumbs up/downs a playlist, and also report a playlist.
 
-[!Your Playlists](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/yourplaylists.PNG?raw=true)
+[!Your Playlists](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/yourplaylists.PNG?raw=true)
 
-[!View Playlist](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/viewplaylists.PNG?raw=true)
+[!View Playlist](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/viewplaylists.PNG?raw=true)
 
-[!Report Playlist](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/reportplaylists.PNG?raw=true)
+[!Report Playlist](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/reportplaylists.PNG?raw=true)
 
 Users can also view shared playlists (playlists that other users have shared publically) by clicking on the Shared Playlists button at the top center portion of the screen.
 
-[!Report Playlist](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/sharedplaylists.PNG?raw=true)
+[!Report Playlist](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/sharedplaylists.PNG?raw=true)
 
 ### **MUMUNDO Admin Features**
 A user is considered an admin on MUMUNDO if they have a red Administrator tag on the top of their MUMUNDO screen. Admins have the ability to view reported playlists and delete other users' playlists.
 
-[!Reported Playlists](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/reportedplaylists.PNG?raw=true)
+[!Reported Playlists](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/reportedplaylists.PNG?raw=true)
 
-[!Delete Playlists](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/deleteplaylists.PNG?raw=true)
+[!Delete Playlists](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/deleteplaylists.PNG?raw=true)
 
 ## **Backend Setup**
 The backend of MUMUNDO was built with FastAPI. It features a MongoDB-backed data layer with models like `User` and `Song`, and includes API routes for authentication (`CoreAuth.py`), user profiles (`profile.py`), music data (`music.py`), admin tools (`admin.py`), and Spotify playlist integration (`spotify_integration.py`). The backend supports static file uploads, centralized logging via `Logger.py`, and database intialization with `MongoHandler.py`.
@@ -105,7 +105,7 @@ The database consists of the following collections:
 5. **`application_logs` Collection:**
    - Fields: `_id`, `timestamp`, `level`, `logger`, `message`
   
-[!MongoDB Database](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/mumundo/demoscreenshots/mongodb.PNG?raw=true)
+[!MongoDB Database](https://github.com/JP-N/Topics-Spring25-Final-Project/blob/main/mumundo/demoscreenshots/mongodb.PNG?raw=true)
 
 ## Tests
 The following unit testing files were implemented:
