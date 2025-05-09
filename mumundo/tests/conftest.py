@@ -7,7 +7,6 @@ from mumundo.backend.models.user import User
 async def test_db():
     client = mongomock_motor.AsyncMongoMockClient()
     db = client["test_db"]
-    print("init")
 
     await init_beanie(database=db, document_models=[User])
     
