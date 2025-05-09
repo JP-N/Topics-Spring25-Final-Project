@@ -6,6 +6,23 @@ Repository for **Topics In Computer Science: Web Application Development With Py
 ## **About MUMUNDO**
 MUMUNDO is derived by blending the first two syllables of "music" (mu-) with the Spanish world "mundo" (meaning world), symbolizing a global community connected through music. MUMUNDO is a music-focused platform that helps users grow their online community by sharing Spotify playlists. Connect your Spotify account, select which playlists to share, and explore music curated by real people. With built-in Spotify integration, users can preview tracks directly in the browser and connect with others through a shared love of music.
 
+## **Initializing Databases and External API's**        
+# **MongoDB**
+Open MongoDB and create a new cluster           
+Then connect to cluster through MongoDB Compass, following the instructions from the following link       
+https://www.mongodb.com/docs/guides/atlas/connection-string/
+
+# **Spotify API**
+Follow the instructions from the below link to set up your own Spotify Client Id and Client Secret
+https://developer.spotify.com/documentation/web-api       
+
+Load the above three connection strings into a .env file following the below example         
+```bash
+SPOTIFY_CLIENT_ID=
+SPOTIFY_CLIENT_SECRET=
+MONGODB_URI=
+```
+
 ## **Initalizing MUMUNDO (on Windows)**
 Start with creating a virtual environment
 
