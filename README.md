@@ -17,9 +17,10 @@ python -m venv venv
 Install Node.js (v18 or later recommended)
 https://nodejs.org/en
 
-then run the following command to install all required packages listed in package.json
+then run the following command to install all required packages listed in package.json and python requirements.txt
 
 ```bash
+pip install -r requirements.txt
 npm install
 ```
 
