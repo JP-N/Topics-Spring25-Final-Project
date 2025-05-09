@@ -130,3 +130,4 @@ The database consists of the following collections:
 The following unit testing files were implemented:
 - test_user.py
 - test_main.py
+- test_report.py
