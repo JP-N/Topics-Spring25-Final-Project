@@ -32,7 +32,7 @@ npm run dev
 
 To access MUMUNDO FastAPI, run the following command
 ```bash
-uvicorn mumundo.backend.main:app --reload
+uvicorn mumundo.main:app --reload
 ```
 
 ## **Frontend Setup**
